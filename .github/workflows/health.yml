@@ -1,0 +1,33 @@
+# Is the hub up? Asked from outside Hostinger, every 15 minutes.
+#
+# A failed run is the alarm: GitHub notifies whoever last changed this
+# schedule, by email and as a push from the GitHub iPhone app. Why this
+# lives here, what /health answers and what it leaves out are in
+# deploy/README.md of my-electron-react-app, "Being told when it is down".
+#
+# Three tries ten seconds apart before failing, so a blip is not an outage.
+#
+# Run it by hand with another address to see the alarm go off: a check
+# that has never failed has not shown it can.
+name: Hub health
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Address to check
+        default: https://sync.ideaquantum.com/health
+
+permissions: {}
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ask the hub
+        env:
+          URL: ${{ inputs.url || 'https://sync.ideaquantum.com/health' }}
+        run: curl --fail --silent --show-error --max-time 20 --retry 2 --retry-delay 10 --retry-all-errors "$URL"
