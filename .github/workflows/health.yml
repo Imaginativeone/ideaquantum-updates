@@ -7,6 +7,13 @@
 #
 # Three tries ten seconds apart before failing, so a blip is not an outage.
 #
+# And when none of the three could even connect, three more five minutes
+# later. Between 20 October and 3 November 2026, 14 of 15 failures were
+# this runner unable to open a connection while the hub went on serving
+# phones and Macs, and the next run passed every time: an alarm about the
+# road from GitHub, not about the hub. An answer the hub gives (a 503
+# when it is unhealthy) still fails at once.
+#
 # Run it by hand with another address to see the alarm go off: a check
 # that has never failed has not shown it can.
 name: Hub health
@@ -25,9 +32,21 @@ permissions: {}
 jobs:
   health:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 9
     steps:
       - name: Ask the hub
         env:
           URL: ${{ inputs.url || 'https://sync.ideaquantum.com/health' }}
-        run: curl --fail --silent --show-error --max-time 20 --retry 2 --retry-delay 10 --retry-all-errors "$URL"
+        run: |
+          ask() { curl --fail --silent --show-error --max-time 20 --retry 2 --retry-delay 10 --retry-all-errors "$URL"; }
+          status=0
+          ask || status=$?
+          # 6 no address, 7 refused, 28 timed out: never reached the hub.
+          case "$status" in
+            0) exit 0 ;;
+            6|7|28)
+              echo "::warning::Could not reach the hub (curl $status). Asking again in five minutes."
+              sleep 300
+              ask ;;
+            *) exit "$status" ;;
+          esac
